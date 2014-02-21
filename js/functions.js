@@ -6,26 +6,72 @@ var map;
 var map2;
 var directionsService;
 var directionsDisplay;
+var otherAddress;
+var address;
+var address2;
+var mode;
+var globalType;
 
-function searchSpecific(caller, mode){
+function clearQueue(){
+	queue = new Array();
+	addToQue();
+	document.getElementById('queue').innerHTML = '<h3 style="text-align:center">Your queue is empty</h3>';
+	checkRoute();
+}
+
+function searchSpecific(caller, modep){
 	//alert(caller);
 	//document.getElementById('grocs').innerHTML="HELLO";
-	if(checkifnotin(caller,queue)){
+	if(caller=='other'){
+		var type = new Object();
+		type.name = "other";
+		type.mode = modep;
+		type.address = otherAddress;
+		globalType = type;
+		mode = modep;
+		queue.push(type);	
+		console.log("added " + otherAddress);
+		addToQue();
+		$( "#gasItems" ).popup( "close" );
+		$( "#chosenAddress" ).popup( "open" );
+	}
+	else if(checkifnotin(caller,queue)){
 		var type = new Object();
 		type.name = caller;
-		type.mode = mode;
+		type.mode = modep;
+		globalType = type;
+		mode = modep;
+		searchForCategory(returnType(caller), modep);
+			// console.log("address added: " + address);
+		// type.address = address;
 		queue.push(type);	
 		console.log("added " + caller);
 		addToQue();
+		$( "#gasItems" ).popup( "close" );
+		$( "#chosenAddress" ).popup( "open" );
 	}else{
 		console.log("not added " + caller);
 	}
+	checkRoute();
 }
 
 function changeName(callerp){
 	console.log("called " + callerp);
 	caller = callerp;
 	document.getElementById('CHANGEME').innerHTML = callerp;	
+}
+
+function removeFromQueue(){
+	for (var i=0;i<queue.length;i++)
+	{ 
+		if(queue[i].name==caller){
+			queue.splice(i, 1);	
+			break;
+		}
+	}
+	
+	addToQue();
+	checkRoute();
 }
 
 function checkifnotin(caller, queue){
@@ -84,6 +130,19 @@ function moveRight(callerp){
 	addToQue();
 }
 
+function checkRoute(){
+	if(queue.length>0){
+		document.getElementById("routeButton").innerHTML = '<a href="#page3"  class="ui-btn ui-btn-b" onclick="checkRoute();" id="routeButton">ROUTE!</a>';
+		for(var i = 0; i < queue.length; i++){
+			console.log("check queue at " + i + "with address " + queue[i].address);
+		}
+	}else{
+		console.log("nothing in queue");
+		document.getElementById('queue').innerHTML = '<h3 style="text-align:center">Your queue is empty</h3>';
+		document.getElementById("routeButton").innerHTML = '<a href="#routePopup"  data-rel="popup" class="ui-btn ui-btn-b" onclick="checkRoute();" id="routeButton" data-transition="pop">ROUTE!</a>';
+	}
+}
+
 function returnImage(caller){
 	if(caller==="GAS"){
 		return "images/gas.png";
@@ -103,8 +162,36 @@ function returnImage(caller){
 		return "images/other.png";
 	}else if(caller==="SHOP"){
 		return "images/shop.png";
+	}else{
+		return "images/other.png";
 	}
 }
+
+function returnType(category){
+	if(caller==="GAS"){
+		return "gas_station";
+	}else if(caller==="GROCERIES"){
+		return "grocery_or_supermarket";
+	}else if(caller==="BANKS"){
+		return "bank";
+	}else if(caller==="CONVENIENCE"){
+		return "convenience_store";
+	}else if(caller==="CARWASH"){
+		return "car_wash";
+	}else if(caller==="COFFEE"){
+		return "cafe";
+	}else if(caller==="FOOD"){
+		return "food";
+	}else if(caller==="OTHER"){
+		return "images/other.png";
+	}else if(caller==="SHOP"){
+		return "shopping_mall";
+	}else{
+		return category;
+	}
+}
+
+
 
 function addToQue(mode){
 	for(i=0;i<queue.length;i++){
@@ -148,12 +235,20 @@ $( document ).on( "pagecreate", "#page2", function() {
             mapTypeId: google.maps.MapTypeId.ROADMAP
         };
         map = new google.maps.Map(document.getElementById("map-canvas"), myOptions);
+		var input = document.getElementById("search");
+		var autocomplete = new google.maps.places.Autocomplete(input);
+		google.maps.event.addListener(autocomplete, 'place_changed', function(){
+			var place = autocomplete.getPlace();
+			searchMe(place.formatted_address);
+			otherAddress = place.geometry.location;
+		});
+
         // Add an overlay to the map of current lat/lng
-        var marker = new google.maps.Marker({
+        /*var marker = new google.maps.Marker({
             position: latlng,
             map: map,
             title: "Greetings!"
-        });
+        });*/
     }
 });
 
@@ -177,10 +272,14 @@ function searchMap(event)
 		var searchVal = document.getElementById("search").value;
 		console.log(searchVal);
 		searchMe(searchVal);
+	}else{
+		
 	}
 }
 
+
 function searchMe(search){
+console.log("search" + search);
 geocoder.geocode( { 'address': search}, function(results, status) {
 		if (status == google.maps.GeocoderStatus.OK) {
 		  map.setCenter(results[0].geometry.location);
@@ -198,10 +297,16 @@ function calcRoute() {
 	console.log("calcRoute");
   var start = "9500 Gilman Dr, San Diego, CA";
   var end = "8510 Genesee Ave";
+  ways = [];
+  for(var i =0; i< queue.length-1; i++){
+    ways.push({location: queue[i].address, stopover:true});
+  }
+    var pyrmont = new google.maps.LatLng(32.8400,-117.2769);
+
   var request = {
-      origin:start,
-      destination:end,
-	  waypoints:[{location:"3233 La Jolla Village Drive", stopover: true}],
+      origin:pyrmont,
+      destination:queue[queue.length-1].address,
+	  waypoints:ways,
       travelMode: google.maps.TravelMode.DRIVING
   };
   directionsService.route(request, function(response, status) {
@@ -214,5 +319,74 @@ function calcRoute() {
   });
 }
 
+function searchForCategory(category, mode) {
+  var pyrmont = new google.maps.LatLng(32.8400,-117.2769);
+  if(queue.length >= 1){
+	pyrmont = queue[queue.length-1].address;
+  }
+	
+	  
+  map = new google.maps.Map(document.getElementById('map-canvas'), {
+      center: pyrmont,
+      zoom: 15
+    });
+	console.log("searchForCategory");
+	
+	places = new google.maps.places.PlacesService(map);
 
+  service = new google.maps.places.PlacesService(map);
+  console.log("search");
+  var search = {
+	location: pyrmont,
+	//radius: '1000',
+	rankBy: google.maps.places.RankBy.DISTANCE,
+    types: [category]
+	}
 
+	var position;
+  places.nearbySearch(search,callbackResults);
+	
+}
+
+function callbackResults(results, status) {
+	resultsRef = results;
+	console.log("nearbysearch");
+	console.log("status" + status);
+    if (status == google.maps.places.PlacesServiceStatus.OK) {
+      for (var i = 0; i < results.length; i++) {
+		console.log("results: " + results[i].geometry.location);
+		console.log("results: " + results[i].name);
+		var ref = results[i].reference;
+		var request = {
+			reference: ref
+		}
+		var min = -1;
+		// service.getDetails(request,function(place, status){if(place != null) { console.log("formatted_address: " + place.formatted_address); console.log("price: " + place.price_level);
+					// if(min == -1 || place.price_level < min){
+						// min = place.price_level;
+						// position = i;
+					// }					
+		
+		
+				// }});
+        
+      }
+    }
+	console.log("check");
+	if(mode=='quick'){
+		console.log("returning quick " + results[0].geometry.location);
+		address = results[0].geometry.location;
+		globalType.address =  results[0].geometry.location;
+		address2 = results[0].geometry.location;
+	}else{
+		console.log("returning cheap " + results[getRandomInt(0,results.length)].geometry.location);
+		address = results[getRandomInt(0,results.length)].geometry.location;
+		globalType.address = results[getRandomInt(0,results.length)].geometry.location;
+		address2 = results[getRandomInt(0,results.length)].geometry.location;
+	}
+	
+}
+
+function getRandomInt(min,max){
+	return Math.floor(Math.random() * (max - min + 1) + min);
+}
